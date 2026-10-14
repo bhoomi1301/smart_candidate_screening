@@ -98,6 +98,21 @@ h1, h2, p {
 
 .stat-card {
   padding: 1.2rem;
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary);
+}
+
+.stat-card.active {
+  border-color: var(--primary);
+  background: #edf4ff;
 }
 
 .stat-card span {
@@ -109,6 +124,10 @@ h1, h2, p {
 
 .stat-card strong {
   font-size: 2rem;
+}
+
+.static-card {
+  cursor: default;
 }
 
 .panel {
@@ -155,7 +174,8 @@ label {
 
 .primary-btn,
 .secondary-btn,
-.small-btn {
+.small-btn,
+.danger-btn {
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -180,6 +200,12 @@ label {
 .secondary-btn, .small-btn {
   background: #e2e8f0;
   color: var(--text);
+  padding: 0.7rem 1rem;
+}
+
+.danger-btn {
+  background: #fee2e2;
+  color: #991b1b;
   padding: 0.7rem 1rem;
 }
 
@@ -274,6 +300,65 @@ th {
 .alert.error {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.alert.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.form-actions,
+.job-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.job-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.job-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.job-card.job-active {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+textarea {
+  width: 100%;
+  padding: 0.75rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.filter-status {
+  margin-bottom: 1rem;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 @media (max-width: 720px) {

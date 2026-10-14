@@ -10,18 +10,129 @@
   </div>
 </div>
 
-<div class="panel form-panel">
-  {% if error %}
-    <div class="alert error">{{ error }}</div>
+{% if error %}
+  <div class="alert error">{{ error }}</div>
+{% endif %}
+{% if success %}
+  <div class="alert success">{{ success }}</div>
+{% endif %}
+
+<div class="panel">
+  <div class="section-header">
+    <h2>Active Job</h2>
+  </div>
+  {% if job_requirements %}
+    <p><strong>{{ job_requirements.title }}</strong></p>
+    <p>{{ job_requirements.description }}</p>
+    <p><strong>Required Skills:</strong> {{ job_requirements.required_skills }}</p>
+    <p><strong>Minimum Experience:</strong> {{ job_requirements.min_experience }} years</p>
+  {% else %}
+    <p>No active job exists yet.</p>
   {% endif %}
-  <form method="POST" action="{{ url_for('jobs') }}">
-    <label for="required_skills">Required Skills</label>
-    <input id="required_skills" name="required_skills" type="text" value="{{ job_requirements.required_skills if job_requirements else '' }}" placeholder="Python, SQL, Communication" required />
+</div>
 
-    <label for="min_experience">Minimum Experience (years)</label>
-    <input id="min_experience" name="min_experience" type="number" min="0" value="{{ job_requirements.min_experience if job_requirements else 0 }}" required />
+<div class="panel">
+  <div class="section-header">
+    <h2>All Jobs</h2>
+  </div>
+  <div class="job-list">
+    {% for job in jobs %}
+      <div class="job-card {% if job.is_active %}job-active{% endif %}">
+        <div class="job-header">
+          <h3>{{ job.title }}</h3>
+          {% if job.is_active %}
+            <span class="status-pill status-shortlisted">Active</span>
+          {% endif %}
+        </div>
+        <p>{{ job.description }}</p>
+        <p><strong>Skills:</strong> {{ job.required_skills }}</p>
+        <p><strong>Experience:</strong> {{ job.min_experience }} years</p>
+        <div class="job-actions">
+          <form method="POST" action="{{ url_for('jobs') }}">
+            <input type="hidden" name="action" value="activate" />
+            <input type="hidden" name="job_id" value="{{ job.id }}" />
+            <button type="submit" class="secondary-btn">Activate</button>
+          </form>
+          <button type="button" class="secondary-btn edit-job-btn" data-job-id="{{ job.id }}" data-title="{{ job.title }}" data-description="{{ job.description }}" data-skills="{{ job.required_skills }}" data-experience="{{ job.min_experience }}">Edit</button>
+          <form method="POST" action="{{ url_for('jobs') }}" onsubmit="return confirm('Delete this job requirement?');">
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="job_id" value="{{ job.id }}" />
+            <button type="submit" class="danger-btn">Delete</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <p>No jobs have been created yet.</p>
+    {% endfor %}
+  </div>
+</div>
 
-    <button type="submit" class="primary-btn">Save Requirements</button>
+<div class="panel form-panel">
+  <div class="section-header">
+    <h2 id="job-form-title">Add Job Requirement</h2>
+  </div>
+  <form id="job-form" method="POST" action="{{ url_for('jobs') }}">
+    <input type="hidden" id="job-action" name="action" value="add" />
+    <input type="hidden" id="job-id" name="job_id" value="" />
+    <div class="form-grid">
+      <div>
+        <label for="title">Job Title</label>
+        <input id="title" name="title" type="text" placeholder="Senior Python Developer" required />
+      </div>
+      <div>
+        <label for="min_experience">Minimum Experience (years)</label>
+        <input id="min_experience" name="min_experience" type="number" min="0" value="0" required />
+      </div>
+      <div class="full-width">
+        <label for="required_skills">Required Skills</label>
+        <input id="required_skills" name="required_skills" type="text" placeholder="Python, SQL, Communication" required />
+      </div>
+      <div class="full-width">
+        <label for="description">Job Description</label>
+        <textarea id="description" name="description" rows="4" placeholder="Describe the role and responsibilities." required></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="primary-btn" id="job-submit-btn">Save Job</button>
+      <button type="button" class="secondary-btn" id="job-cancel-btn" style="display:none;">Cancel</button>
+    </div>
   </form>
 </div>
+
+<script>
+  const form = document.getElementById('job-form');
+  const jobAction = document.getElementById('job-action');
+  const jobId = document.getElementById('job-id');
+  const jobTitle = document.getElementById('title');
+  const jobDescription = document.getElementById('description');
+  const jobSkills = document.getElementById('required_skills');
+  const jobExperience = document.getElementById('min_experience');
+  const formTitle = document.getElementById('job-form-title');
+  const submitButton = document.getElementById('job-submit-btn');
+  const cancelButton = document.getElementById('job-cancel-btn');
+
+  document.querySelectorAll('.edit-job-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      jobAction.value = 'edit';
+      jobId.value = button.dataset.jobId;
+      jobTitle.value = button.dataset.title;
+      jobDescription.value = button.dataset.description;
+      jobSkills.value = button.dataset.skills;
+      jobExperience.value = button.dataset.experience;
+      formTitle.textContent = 'Edit Job Requirement';
+      submitButton.textContent = 'Update Job';
+      cancelButton.style.display = 'inline-flex';
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  cancelButton.addEventListener('click', () => {
+    jobAction.value = 'add';
+    jobId.value = '';
+    form.reset();
+    formTitle.textContent = 'Add Job Requirement';
+    submitButton.textContent = 'Save Job';
+    cancelButton.style.display = 'none';
+  });
+</script>
 {% endblock %}

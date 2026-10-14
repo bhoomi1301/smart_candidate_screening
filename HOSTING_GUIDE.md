@@ -1,93 +1,80 @@
-# Hosting Guide for Free Deployment
+# Hosting Guide
 
-This project is a Python Flask application. For a free public deployment, the best choices are Render, Railway, or PythonAnywhere. Vercel is usually better for JavaScript frontend apps and can be awkward for Flask unless you are using a more custom server setup.
+This project is a Flask-based recruitment dashboard. It can be hosted on any platform that supports Python web apps, but the recommended free choices are Render and Railway.
 
-## Best free options
+## Recommended free hosting options
 
-### Option 1: Render (recommended)
-Render is one of the easiest ways to deploy a Python web app for free.
+### 1) Render
+Render is the easiest option for a Flask app like this.
 
-#### Steps
+#### Setup steps
 1. Push the project to GitHub.
-2. Create a free Render account.
+2. Sign in to Render.
 3. Click New > Web Service.
-4. Connect your GitHub repository.
+4. Connect the repository.
 5. Use these settings:
    - Name: `smart-candidate-screening`
    - Runtime: `Python 3`
    - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn app:app`
-6. Add a port environment variable if needed:
-   - `PORT=10000` (Render usually manages this automatically)
-7. Deploy.
+   - Start Command: `gunicorn app:app --bind 0.0.0.0:$PORT`
+6. Deploy.
 
-#### Important note
-This project already has Flask and SQLite support, but for production hosting you should use Gunicorn instead of the development server. Add this to `requirements.txt`:
+#### Notes
+- This app uses SQLite locally, so the database file will be created in the project root.
+- For free hosting, keep in mind that the SQLite file may not persist across all providers unless your plan supports persistent storage.
+- If you want a fully production-safe pattern, move SQLite to a managed database later.
 
-```
-Flask==3.0.3
-gunicorn==22.0.0
-pytest==8.3.2
-```
+### 2) Railway
+Railway also works well for Python projects.
 
-Then start the app with:
-
-```
-gunicorn app:app --bind 0.0.0.0:$PORT
-```
-
-### Option 2: Railway
-Railway is also a strong free Python hosting option.
-
-#### Steps
+#### Setup steps
 1. Sign up for Railway.
-2. Create a new project.
-3. Import the GitHub repository.
-4. Set the service type to `Python`.
-5. Use the root folder of the project.
-6. Add install command:
+2. Create a new project and import the GitHub repo.
+3. Choose a Python service.
+4. Set the install command:
    ```bash
    pip install -r requirements.txt
    ```
-7. Add start command:
+5. Set the start command:
    ```bash
    gunicorn app:app --bind 0.0.0.0:$PORT
    ```
-8. Deploy and copy the public URL.
+6. Deploy and copy the public URL.
 
-### Option 3: PythonAnywhere
-PythonAnywhere is beginner-friendly for Flask apps.
+### 3) PythonAnywhere
+PythonAnywhere is also suitable for Flask apps and is beginner-friendly.
 
-#### Steps
-1. Sign up for a free account.
-2. Upload or connect the GitHub repo.
-3. Create a new web app.
-4. Set the project folder and WSGI config.
-5. Install requirements with pip.
-6. Reload the web app.
+#### Setup steps
+1. Create an account.
+2. Upload or connect the project.
+3. Configure a web app with Python.
+4. Install requirements from `requirements.txt`.
+5. Set the WSGI app to `app.app`.
+6. Reload the app.
 
-## Why not Vercel as the first choice?
-Vercel is great for frontend apps and serverless JavaScript projects, but Flask is a Python app with a long-lived web process. It is possible to deploy Python there in some cases, but it is not the easiest or most transparent path for this assignment. For a recruiter-facing Flask app, Render or Railway is usually better and more reliable.
-
-## Tips for sharing with an employer
-- Use the deployed public URL in the README.
-- Keep the app stable and test the login flow before sending the link.
-- Include the demo login credentials in a secure file or private message, not on the visible page.
-- If you use a free hosting tier, make sure the app starts automatically and the database persists for demo purposes.
-
-## Recommended final publish flow
-For this assignment, the simplest final setup is:
-
-1. Push the project to GitHub.
-2. Deploy to Render.
-3. Copy the live link.
-4. Share the link and credentials privately with the employer.
-
-## Example deployment command
-If you want a command to run in a hosted environment, use:
+## Local production-like command
+Use this when deploying to a host that supports Gunicorn:
 
 ```bash
 gunicorn app:app --bind 0.0.0.0:$PORT
 ```
 
-This is the standard way to run a Flask app in a production-like hosting service.
+## Important app notes
+- The app expects the database file to exist and initializes it automatically on first run.
+- The app uses a session-based admin login.
+- Job activation affects candidate scoring because the active job is the one used for match calculation.
+
+## Recommended final flow
+1. Push the code to GitHub.
+2. Deploy to Render or Railway.
+3. Test the login flow and candidate/job management pages.
+4. Share the deployment URL and demo credentials privately.
+
+## Suggested environment variables
+If needed, you may set:
+
+```bash
+SECRET_KEY=your_secure_value
+```
+
+This custom secret can be used in place of the default app secret key for better security in hosted environments.

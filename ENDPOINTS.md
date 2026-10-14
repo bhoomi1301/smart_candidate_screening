@@ -1,21 +1,21 @@
 # API and Route Reference
 
-This Flask app uses a simple session-based admin workflow. All routes below are implemented in `app.py` and serve the recruitment screening features.
+This Flask app uses a session-based admin workflow. All routes below are implemented in `app.py` and support the recruitment screening flow.
 
 ## Public routes
 
 ### GET /
 - Redirects logged-in users to the dashboard.
 - Redirects logged-out users to the login screen.
-- Purpose: app entry point.
+- Purpose: application entry point.
 
 ### GET /login
 - Displays the login page.
 - Purpose: HR/admin sign-in screen.
 
 ### POST /login
-- Receives email and password from the login form.
-- Validates credentials against the SQLite `admin_users` table.
+- Accepts email and password.
+- Validates credentials against `admin_users` in SQLite.
 - Creates a session on success and redirects to the dashboard.
 - Purpose: authentication.
 
@@ -26,48 +26,57 @@ This Flask app uses a simple session-based admin workflow. All routes below are 
 - Purpose: sign-out.
 
 ### GET /dashboard
-- Fetches all candidate records from SQLite.
-- Calculates summary values such as total, pending, shortlisted, rejected, and average score.
-- Renders the dashboard view.
-- Purpose: overview of recruitment progress and candidate status.
+- Reads all candidates or a filtered set by status.
+- Calculates summary counts for total, pending, shortlisted, rejected, and average score.
+- Supports `?status=All|Pending|Shortlisted|Rejected`.
+- Purpose: recruiting overview and quick screening filters.
 
 ### GET /candidates
 - Displays the candidate list.
-- Supports a search query via `?q=...` for name, email, or skill filtering.
+- Supports a search query via `?q=...` for name, email, or skill.
 - Purpose: searchable candidate table for HR review.
 
 ### POST /candidates/add
-- Accepts candidate details: name, email, experience, skills.
-- Calculates a match score using the current job requirement values.
-- Stores a new record with the status set to `Pending`.
-- Purpose: add a new applicant to the shortlist workflow.
+- Accepts name, email, experience, and skills.
+- Validates email and numeric experience input.
+- Calculates the match score using the active job profile.
+- Stores the new record with status `Pending`.
+- Purpose: add a candidate to the pipeline.
 
 ### POST /candidates/<int:candidate_id>/status
-- Updates the selected candidate status to `Pending`, `Shortlisted`, or `Rejected`.
-- Purpose: move candidates through screening stages.
+- Updates the candidate status to `Pending`, `Shortlisted`, or `Rejected`.
+- Purpose: move candidates through the hiring stages.
+
+### POST /candidates/<int:candidate_id>/delete
+- Deletes the selected candidate from the database.
+- Purpose: remove candidates no longer in consideration.
 
 ### GET /jobs
-- Shows the current job requirement configuration.
-- Purpose: display the active job profile used for pairing candidates with the role.
+- Displays all stored job requirements and the currently active job.
+- Purpose: manage hiring roles and screening criteria.
 
 ### POST /jobs
-- Updates the required skills and minimum experience.
-- Recalculates all candidate match scores after the requirement change.
-- Purpose: realign screening logic with the latest job description.
+- Supports several actions via the `action` form field:
+  - `add`: creates a new job requirement with title, description, skills, and minimum experience
+  - `edit`: updates an existing job record
+  - `activate`: marks a specific job as the active one used for candidate scoring
+  - `delete`: removes a non-required job profile
+- Recalculates candidate scores whenever the active job changes.
+- Purpose: maintain multiple roles and update screening logic safely.
 
 ## Matching logic summary
 
-The application computes a match percentage using:
+The app computes a match percentage using three main inputs:
 
-- required skill set from the job requirements
-- candidate skill set from the candidate profile
-- years of experience compared to minimum experience
+- required skill set from the active job
+- candidate skill set from the application profile
+- years of experience versus the minimum experience requirement
 
-The formula is:
+The calculation is:
 
-- overlap = number of skills present in both required and candidate skill sets
+- overlap = number of skills present in both sets
 - skill percentage = (overlap / total required skills) * 100
-- experience bonus = +10 percentage points if experience meets the minimum
-- final score is clamped between 0 and 100
+- experience bonus = +10 percentage points if the candidate meets the minimum experience
+- final score is capped between 0 and 100
 
-This produces a simple but useful score that helps HR prioritize applicants without requiring ML or advanced NLP.
+This gives recruiters a simple, explainable score for candidate prioritization without requiring machine learning.

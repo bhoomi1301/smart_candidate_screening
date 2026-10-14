@@ -11,6 +11,13 @@
   <a href="#add-candidate" class="primary-btn">Add Candidate</a>
 </div>
 
+{% if error %}
+  <div class="alert error">{{ error }}</div>
+{% endif %}
+{% if success %}
+  <div class="alert success">{{ success }}</div>
+{% endif %}
+
 <div class="panel">
   <div class="section-header compact-header">
     <h2>Search Candidates</h2>
@@ -25,9 +32,6 @@
   <div class="section-header compact-header">
     <h2>Add Candidate</h2>
   </div>
-  {% if error %}
-    <div class="alert error">{{ error }}</div>
-  {% endif %}
   <form method="POST" action="{{ url_for('add_candidate') }}" class="candidate-form">
     <div class="form-grid">
       <div>
@@ -65,6 +69,7 @@
           <th>Skills</th>
           <th>Match</th>
           <th>Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -85,10 +90,15 @@
               <button type="submit" class="small-btn">Update</button>
             </form>
           </td>
+          <td>
+            <form method="POST" action="{{ url_for('delete_candidate', candidate_id=candidate.id) }}" onsubmit="return confirm('Delete this candidate?');">
+              <button type="submit" class="danger-btn">Delete</button>
+            </form>
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6">No candidate records found.</td>
+          <td colspan="7">No candidate records found.</td>
         </tr>
         {% endfor %}
       </tbody>

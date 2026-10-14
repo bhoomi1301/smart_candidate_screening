@@ -11,23 +11,23 @@
 </div>
 
 <div class="stats-grid">
-  <div class="stat-card">
+  <a href="{{ url_for('dashboard', status='All') }}" class="stat-card {% if active_status == 'All' %}active{% endif %}">
     <span>Total Candidates</span>
     <strong>{{ total_candidates }}</strong>
-  </div>
-  <div class="stat-card">
+  </a>
+  <a href="{{ url_for('dashboard', status='Pending') }}" class="stat-card {% if active_status == 'Pending' %}active{% endif %}">
     <span>Pending</span>
     <strong>{{ pending }}</strong>
-  </div>
-  <div class="stat-card">
+  </a>
+  <a href="{{ url_for('dashboard', status='Shortlisted') }}" class="stat-card {% if active_status == 'Shortlisted' %}active{% endif %}">
     <span>Shortlisted</span>
     <strong>{{ shortlisted }}</strong>
-  </div>
-  <div class="stat-card">
+  </a>
+  <a href="{{ url_for('dashboard', status='Rejected') }}" class="stat-card {% if active_status == 'Rejected' %}active{% endif %}">
     <span>Rejected</span>
     <strong>{{ rejected }}</strong>
-  </div>
-  <div class="stat-card">
+  </a>
+  <div class="stat-card static-card">
     <span>Average Match</span>
     <strong>{{ avg_score }}%</strong>
   </div>
@@ -38,6 +38,7 @@
     <h2>Current Job Requirements</h2>
   </div>
   {% if job_requirements %}
+  <p><strong>Role:</strong> {{ job_requirements.title }}</p>
   <p><strong>Required Skills:</strong> {{ job_requirements.required_skills }}</p>
   <p><strong>Minimum Experience:</strong> {{ job_requirements.min_experience }} years</p>
   {% endif %}
@@ -45,8 +46,11 @@
 
 <div class="panel">
   <div class="section-header">
-    <h2>Recent Candidate Activity</h2>
+    <h2>Candidate Activity</h2>
   </div>
+  {% if active_status != 'All' %}
+    <p class="filter-status">Showing {{ active_status }} candidates.</p>
+  {% endif %}
   <table>
     <thead>
       <tr>
@@ -57,7 +61,7 @@
       </tr>
     </thead>
     <tbody>
-      {% for candidate in candidates[:5] %}
+      {% for candidate in candidates %}
       <tr>
         <td>{{ candidate.name }}</td>
         <td>{{ candidate.experience }} yrs</td>
@@ -66,7 +70,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="4">No candidates yet.</td>
+        <td colspan="4">No candidates match the selected filter.</td>
       </tr>
       {% endfor %}
     </tbody>
