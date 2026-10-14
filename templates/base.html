@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Smart Candidate Screening{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Smart Candidate Screening</div>
+      {% if session.get('user_id') %}
+      <nav class="nav-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('candidates') }}">Candidates</a>
+        <a href="{{ url_for('jobs') }}">Jobs</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+      </nav>
+      {% endif %}
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

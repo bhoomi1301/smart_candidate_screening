@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Job Requirements | Smart Candidate Screening{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Setup</p>
+    <h1>Job Requirements</h1>
+  </div>
+</div>
+
+<div class="panel form-panel">
+  {% if error %}
+    <div class="alert error">{{ error }}</div>
+  {% endif %}
+  <form method="POST" action="{{ url_for('jobs') }}">
+    <label for="required_skills">Required Skills</label>
+    <input id="required_skills" name="required_skills" type="text" value="{{ job_requirements.required_skills if job_requirements else '' }}" placeholder="Python, SQL, Communication" required />
+
+    <label for="min_experience">Minimum Experience (years)</label>
+    <input id="min_experience" name="min_experience" type="number" min="0" value="{{ job_requirements.min_experience if job_requirements else 0 }}" required />
+
+    <button type="submit" class="primary-btn">Save Requirements</button>
+  </form>
+</div>
+{% endblock %}

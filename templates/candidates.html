@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Candidates | Smart Candidate Screening{% endblock %}
+
+{% block content %}
+<div class="page-header split-header">
+  <div>
+    <p class="eyebrow">Recruitment</p>
+    <h1>Candidate List</h1>
+  </div>
+  <a href="#add-candidate" class="primary-btn">Add Candidate</a>
+</div>
+
+<div class="panel">
+  <div class="section-header compact-header">
+    <h2>Search Candidates</h2>
+  </div>
+  <form method="GET" action="{{ url_for('candidates') }}" class="inline-form">
+    <input type="text" name="q" value="{{ search_term }}" placeholder="Search by name, email or skill" />
+    <button type="submit" class="secondary-btn">Search</button>
+  </form>
+</div>
+
+<div class="panel" id="add-candidate">
+  <div class="section-header compact-header">
+    <h2>Add Candidate</h2>
+  </div>
+  {% if error %}
+    <div class="alert error">{{ error }}</div>
+  {% endif %}
+  <form method="POST" action="{{ url_for('add_candidate') }}" class="candidate-form">
+    <div class="form-grid">
+      <div>
+        <label for="name">Full Name</label>
+        <input id="name" name="name" type="text" required />
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required />
+      </div>
+      <div>
+        <label for="experience">Experience (years)</label>
+        <input id="experience" name="experience" type="number" min="0" required />
+      </div>
+      <div>
+        <label for="skills">Skills</label>
+        <input id="skills" name="skills" type="text" placeholder="Python, SQL, Communication" required />
+      </div>
+    </div>
+    <button type="submit" class="primary-btn">Save Candidate</button>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="section-header compact-header">
+    <h2>Results</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Experience</th>
+          <th>Skills</th>
+          <th>Match</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for candidate in candidates %}
+        <tr>
+          <td>{{ candidate.name }}</td>
+          <td>{{ candidate.email }}</td>
+          <td>{{ candidate.experience }} yrs</td>
+          <td>{{ candidate.skills }}</td>
+          <td>{{ candidate.match_score }}%</td>
+          <td>
+            <form method="POST" action="{{ url_for('update_candidate_status', candidate_id=candidate.id) }}" class="status-form">
+              <select name="status">
+                <option value="Pending" {% if candidate.status == 'Pending' %}selected{% endif %}>Pending</option>
+                <option value="Shortlisted" {% if candidate.status == 'Shortlisted' %}selected{% endif %}>Shortlisted</option>
+                <option value="Rejected" {% if candidate.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+              </select>
+              <button type="submit" class="small-btn">Update</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">No candidate records found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

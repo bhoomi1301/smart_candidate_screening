@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Smart Candidate Screening{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Overview</p>
+    <h1>Dashboard</h1>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <span>Total Candidates</span>
+    <strong>{{ total_candidates }}</strong>
+  </div>
+  <div class="stat-card">
+    <span>Pending</span>
+    <strong>{{ pending }}</strong>
+  </div>
+  <div class="stat-card">
+    <span>Shortlisted</span>
+    <strong>{{ shortlisted }}</strong>
+  </div>
+  <div class="stat-card">
+    <span>Rejected</span>
+    <strong>{{ rejected }}</strong>
+  </div>
+  <div class="stat-card">
+    <span>Average Match</span>
+    <strong>{{ avg_score }}%</strong>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="section-header">
+    <h2>Current Job Requirements</h2>
+  </div>
+  {% if job_requirements %}
+  <p><strong>Required Skills:</strong> {{ job_requirements.required_skills }}</p>
+  <p><strong>Minimum Experience:</strong> {{ job_requirements.min_experience }} years</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="section-header">
+    <h2>Recent Candidate Activity</h2>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Experience</th>
+        <th>Match</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for candidate in candidates[:5] %}
+      <tr>
+        <td>{{ candidate.name }}</td>
+        <td>{{ candidate.experience }} yrs</td>
+        <td>{{ candidate.match_score }}%</td>
+        <td><span class="status-pill status-{{ candidate.status.lower() | replace(' ', '-') }}">{{ candidate.status }}</span></td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4">No candidates yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
