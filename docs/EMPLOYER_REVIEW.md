@@ -1,6 +1,10 @@
 # TalentLens: Employer Review Notes
 
-A short companion to the [README](../README.md) for a live review. Every number below comes from the latest test run (2026-10-15).
+A short companion to the [README](../README.md) for a live review.
+
+**Live app:** https://smart-candidate-screening.vercel.app · **API docs:** https://talentlens-api-o5pl.onrender.com/docs · **Health:** https://talentlens-api-o5pl.onrender.com/health
+
+The free server sleeps when idle, so allow about a minute for the first request. Every number below comes from the latest test run (2026-10-15).
 
 ---
 

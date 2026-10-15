@@ -4,7 +4,7 @@ TalentLens is a multi-tenant recruitment application. HR teams record candidates
 
 It consists of a FastAPI + PostgreSQL API and a React + TypeScript web app.
 
-> **Deployment status:** the application is prepared for Vercel (frontend), Render (API) and Render PostgreSQL, and was verified locally in production mode. **No public deployment has been verified yet, so no public URLs are listed.** See [HOSTING_GUIDE.md](HOSTING_GUIDE.md) for the steps.
+> **Live:** **https://smart-candidate-screening.vercel.app** (web app) · API docs **https://talentlens-api-o5pl.onrender.com/docs** · health **https://talentlens-api-o5pl.onrender.com/health**. Hosted on Vercel, Render and Render PostgreSQL; see [section 11](#11-deployment).
 
 ---
 
@@ -323,9 +323,28 @@ Rebuilding the database and seeding again reproduces identical scores: 83.33, 20
 
 | Item | Status |
 |---|---|
-| Public frontend URL | **Not deployed yet.** None verified. |
-| Public API health URL | **Not deployed yet.** It will be `https://<render-service>.onrender.com/health`. |
-| API documentation URL | **Not deployed yet.** It will be `https://<render-service>.onrender.com/docs`. |
+| Public frontend URL | **https://smart-candidate-screening.vercel.app** (Vercel, HTTPS) |
+| Public API health URL | **https://talentlens-api-o5pl.onrender.com/health**, which returns `{"status":"ok","database":"ok"}` |
+| API documentation URL | **https://talentlens-api-o5pl.onrender.com/docs** (OpenAPI schema at `/openapi.json`) |
+| Database | Render managed PostgreSQL (`talentlens-db`), migrated by Alembic on each deploy |
+
+**Verified live on 2026-10-15:**
+
+- **Without an account:**
+  - HTTPS, direct links to inner pages, and security headers on the site;
+  - `/health` reaching the database both through the Vercel proxy and directly on Render;
+  - `/docs` listing all 44 operations, and unauthenticated requests rejected (401) with the standard error format;
+  - the Origin check accepting the site and rejecting other origins (403);
+  - the API healthy across redeploys.
+- **Signed-in flow,** run by the project owner on the live site, all passing:
+  - registration, and staying signed in after a reload;
+  - creating a candidate and a job;
+  - applying the candidate and getting the expected score (83.33, not eligible);
+  - Under Review → Shortlisted with timestamped history, and correct dashboard counts;
+  - a second workspace receiving "Not found" for the first one's records;
+  - data persisting after signing back in and after a redeploy.
+
+The free Render instance sleeps when idle, so the first request after a pause can take about 50 seconds.
 
 The configuration is in the repository:
 
@@ -640,7 +659,6 @@ Frontend tests by file:
 
 **Limitations:**
 
-- **Not publicly deployed yet.** The production configuration was verified locally, not on Render or Vercel.
 - **No rate limiting** on login or registration. Add it at the edge before broad public use.
 - **No password reset or email verification.** Admins create HR users with an initial password.
 - **Skill matching is exact plus listed synonyms.** Unlisted variants (for example "ReactJS Native") won't match until they are added to the synonym table.
