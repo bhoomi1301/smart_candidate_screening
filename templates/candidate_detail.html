@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ candidate.name }} | Smart Candidate Screening{% endblock %}
+
+{% block content %}
+<div class="page-header split-header">
+  <div>
+    <p class="eyebrow">Candidate profile</p>
+    <h1>{{ candidate.name }}</h1>
+  </div>
+  <a class="secondary-btn" href="{{ url_for('candidates') }}">Back to candidates</a>
+</div>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+{% if success %}<div class="alert success">{{ success }}</div>{% endif %}
+
+<div class="panel">
+  <div class="section-header"><h2>Contact and experience</h2></div>
+  <div class="form-grid">
+    <p><strong>Email</strong><br>{{ candidate.email }}</p>
+    <p><strong>Phone</strong><br>{{ candidate.phone or 'Not provided' }}</p>
+    <p><strong>Experience</strong><br>{{ candidate.experience if candidate.experience is not none else 'Not provided' }}{% if candidate.experience is not none %} years{% endif %}</p>
+    <p><strong>Education</strong><br>{{ candidate.education | join(', ') if candidate.education else 'Not provided' }}</p>
+  </div>
+  <p><strong>Skills</strong><br>{{ candidate.skills | join(', ') if candidate.skills else 'Not provided' }}</p>
+</div>
+
+<div class="panel">
+  <div class="section-header"><h2>Applications</h2></div>
+  {% for item in applications %}
+    <div class="application-summary">
+      <h3>{{ item.job.title }} <span class="status-pill status-{{ item.status.lower() | replace(' ', '-') }}">{{ item.status }}</span></h3>
+      <p>Suitability score: <strong>{{ item.score }}%</strong>{% if item.score_breakdown.incomplete %} <span class="muted">Candidate information is incomplete.</span>{% endif %}</p>
+      <p>Matched skills: {{ item.score_breakdown.matched_skills | join(', ') if item.score_breakdown.matched_skills else 'None recorded' }}</p>
+      <p>Missing skills: {{ item.score_breakdown.missing_skills | join(', ') if item.score_breakdown.missing_skills else 'None' }}</p>
+      {% if item.notes %}<p>HR notes: {{ item.notes }}</p>{% endif %}
+      <form method="POST" action="{{ url_for('update_application_form', application_id=item.id) }}" class="candidate-form">
+        <div class="form-grid">
+          <div>
+            <label for="status-{{ item.id }}">Decision</label>
+            <select id="status-{{ item.id }}" name="status">
+              {% if item.status == 'Pending' %}
+                <option>Under Review</option><option>Rejected</option>
+              {% elif item.status == 'Under Review' %}
+                <option>Shortlisted</option><option>Rejected</option>
+              {% elif item.status == 'Shortlisted' %}
+                <option>Under Review</option><option>Rejected</option>
+              {% else %}
+                <option>Rejected</option>
+              {% endif %}
+            </select>
+          </div>
+          <div>
+            <label for="notes-{{ item.id }}">Decision notes</label>
+            <input id="notes-{{ item.id }}" name="notes" type="text" maxlength="5000" placeholder="Add context for the decision" />
+          </div>
+        </div>
+        <button type="submit" class="secondary-btn">Save decision</button>
+      </form>
+      <details>
+        <summary>Status history</summary>
+        <ul>
+          {% for event in item.history %}
+            <li>{{ event.changed_at }}: {{ event.from_status or 'New' }} to {{ event.to_status }}{% if event.notes %} ({{ event.notes }}){% endif %}</li>
+          {% endfor %}
+        </ul>
+      </details>
+    </div>
+  {% else %}
+    <p>This candidate has no applications yet.</p>
+  {% endfor %}
+</div>
+
+{% if available_jobs %}
+<div class="panel">
+  <div class="section-header"><h2>Apply to another vacancy</h2></div>
+  <form method="POST" action="{{ url_for('add_application_form', candidate_id=candidate.id) }}" class="inline-form">
+    <label for="job_id">Vacancy</label>
+    <select id="job_id" name="job_id" required>
+      {% for job in available_jobs %}<option value="{{ job.id }}">{{ job.title }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="primary-btn">Create application</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

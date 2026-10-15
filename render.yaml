@@ -1,0 +1,40 @@
+# Render Blueprint: managed PostgreSQL + the FastAPI service (Docker).
+# Create it from the Render dashboard: New > Blueprint > select this repository.
+# Values marked `sync: false` are prompted for during setup and never stored in Git.
+databases:
+  - name: talentlens-db
+    databaseName: talentlens
+    user: talentlens
+    plan: free            # Free Render databases expire after 30 days; use a paid plan for anything longer-lived.
+
+services:
+  - type: web
+    name: talentlens-api  # Public URL becomes https://talentlens-api.onrender.com if the name is available.
+    runtime: docker
+    plan: free            # Free instances sleep when idle; the first request after a pause can take ~1 minute.
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: talentlens-db
+          property: connectionString
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      # The frontend proxies /api through Vercel, so cookies are first-party and Lax is sufficient.
+      - key: COOKIE_SAMESITE
+        value: lax
+      # JSON list with the exact Vercel origin, e.g. ["https://talentlens.vercel.app"]
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # e.g. https://talentlens.vercel.app (GET / on the API redirects here)
+      - key: FRONTEND_URL
+        sync: false
+      # Vercel's proxy accepts request bodies up to about 4.5 MB, so keep uploads below that.
+      - key: RESUME_MAX_BYTES
+        value: "4194304"
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"

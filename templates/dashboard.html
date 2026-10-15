@@ -11,22 +11,30 @@
 </div>
 
 <div class="stats-grid">
-  <a href="{{ url_for('dashboard', status='All') }}" class="stat-card {% if active_status == 'All' %}active{% endif %}">
+  <a href="{{ url_for('dashboard') }}?status=All&amp;job_id={{ selected_job_id }}" class="stat-card {% if active_status == 'All' %}active{% endif %}">
     <span>Total Candidates</span>
     <strong>{{ total_candidates }}</strong>
   </a>
-  <a href="{{ url_for('dashboard', status='Pending') }}" class="stat-card {% if active_status == 'Pending' %}active{% endif %}">
+  <a href="{{ url_for('dashboard') }}?status=Pending&amp;job_id={{ selected_job_id }}" class="stat-card {% if active_status == 'Pending' %}active{% endif %}">
     <span>Pending</span>
     <strong>{{ pending }}</strong>
   </a>
-  <a href="{{ url_for('dashboard', status='Shortlisted') }}" class="stat-card {% if active_status == 'Shortlisted' %}active{% endif %}">
+  <a href="{{ url_for('dashboard') }}?status=Shortlisted&amp;job_id={{ selected_job_id }}" class="stat-card {% if active_status == 'Shortlisted' %}active{% endif %}">
     <span>Shortlisted</span>
     <strong>{{ shortlisted }}</strong>
   </a>
-  <a href="{{ url_for('dashboard', status='Rejected') }}" class="stat-card {% if active_status == 'Rejected' %}active{% endif %}">
+  <a href="{{ url_for('dashboard') }}?status=Rejected&amp;job_id={{ selected_job_id }}" class="stat-card {% if active_status == 'Rejected' %}active{% endif %}">
     <span>Rejected</span>
     <strong>{{ rejected }}</strong>
   </a>
+  <a href="{{ url_for('dashboard') }}?status=Under%20Review&amp;job_id={{ selected_job_id }}" class="stat-card {% if active_status == 'Under Review' %}active{% endif %}">
+    <span>Under Review</span>
+    <strong>{{ under_review }}</strong>
+  </a>
+  <div class="stat-card static-card">
+    <span>Open Vacancies</span>
+    <strong>{{ analytics.active_vacancies }}</strong>
+  </div>
   <div class="stat-card static-card">
     <span>Average Match</span>
     <strong>{{ avg_score }}%</strong>
@@ -35,13 +43,66 @@
 
 <div class="panel">
   <div class="section-header">
-    <h2>Current Job Requirements</h2>
+    <h2>Vacancy overview</h2>
   </div>
+  <form method="GET" action="{{ url_for('dashboard') }}" class="inline-form dashboard-filter">
+    <label for="job_id">Selected vacancy</label>
+    <select id="job_id" name="job_id">
+      {% for job in jobs %}
+        <option value="{{ job.id }}" {% if selected_job_id == job.id %}selected{% endif %}>{{ job.title }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="secondary-btn">View</button>
+  </form>
   {% if job_requirements %}
   <p><strong>Role:</strong> {{ job_requirements.title }}</p>
-  <p><strong>Required Skills:</strong> {{ job_requirements.required_skills }}</p>
+  <p><strong>Required Skills:</strong> {{ job_requirements.required_skills | join(', ') }}</p>
+  <p><strong>Preferred Skills:</strong> {{ job_requirements.preferred_skills | join(', ') if job_requirements.preferred_skills else 'None specified' }}</p>
   <p><strong>Minimum Experience:</strong> {{ job_requirements.min_experience }} years</p>
+  {% else %}
+  <p>No open vacancies are available.</p>
   {% endif %}
+</div>
+
+<div class="analytics-grid">
+  <section class="panel">
+    <div class="section-header"><h2>Status distribution</h2></div>
+    {% set application_total = analytics.application_statuses.values() | sum %}
+    {% for label, count in analytics.application_statuses.items() %}
+      <div class="distribution-row">
+        <span>{{ label }}</span>
+        <div class="bar-track"><span class="bar-fill" style="width: {{ (count / application_total * 100) if application_total else 0 }}%"></span></div>
+        <strong>{{ count }}</strong>
+      </div>
+    {% endfor %}
+  </section>
+  <section class="panel">
+    <div class="section-header"><h2>Average score by job</h2></div>
+    {% for item in analytics.average_scores_by_job %}
+      <div class="score-row"><span>{{ item.title }}</span><strong>{{ item.average_score }}%</strong><span class="muted">{{ item.applications }} applicants</span></div>
+    {% else %}
+      <p>No scored applications yet.</p>
+    {% endfor %}
+  </section>
+</div>
+
+<div class="panel">
+  <div class="section-header"><h2>Top-ranked applicants</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Candidate</th><th>Score</th><th>Status</th><th>Missing skills</th></tr></thead>
+      <tbody>
+        {% for item in analytics.top_applicants %}
+        <tr>
+          <td><a href="{{ url_for('candidate_detail', candidate_id=item.candidate_id) }}">{{ item.candidate.name }}</a></td>
+          <td>{{ item.score }}%</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.score_breakdown.missing_skills | join(', ') if item.score_breakdown.missing_skills else 'None' }}</td>
+        </tr>
+        {% else %}<tr><td colspan="4">No applications for this vacancy.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <div class="panel">
@@ -63,7 +124,7 @@
     <tbody>
       {% for candidate in candidates %}
       <tr>
-        <td>{{ candidate.name }}</td>
+        <td><a href="{{ url_for('candidate_detail', candidate_id=candidate.id) }}">{{ candidate.name }}</a></td>
         <td>{{ candidate.experience }} yrs</td>
         <td>{{ candidate.match_score }}%</td>
         <td><span class="status-pill status-{{ candidate.status.lower() | replace(' ', '-') }}">{{ candidate.status }}</span></td>

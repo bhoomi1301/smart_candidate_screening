@@ -47,8 +47,16 @@
         <input id="experience" name="experience" type="number" min="0" required />
       </div>
       <div>
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" type="tel" />
+      </div>
+      <div>
         <label for="skills">Skills</label>
         <input id="skills" name="skills" type="text" placeholder="Python, SQL, Communication" required />
+      </div>
+      <div>
+        <label for="education">Education / qualifications</label>
+        <input id="education" name="education" type="text" placeholder="BSc Computer Science, AWS Certified" />
       </div>
     </div>
     <button type="submit" class="primary-btn">Save Candidate</button>
@@ -75,25 +83,32 @@
       <tbody>
         {% for candidate in candidates %}
         <tr>
-          <td>{{ candidate.name }}</td>
+          <td><a href="{{ url_for('candidate_detail', candidate_id=candidate.id) }}">{{ candidate.name }}</a></td>
           <td>{{ candidate.email }}</td>
           <td>{{ candidate.experience }} yrs</td>
           <td>{{ candidate.skills }}</td>
           <td>{{ candidate.match_score }}%</td>
           <td>
+            {% if candidate.status != 'Not Applied' %}
             <form method="POST" action="{{ url_for('update_candidate_status', candidate_id=candidate.id) }}" class="status-form">
               <select name="status">
                 <option value="Pending" {% if candidate.status == 'Pending' %}selected{% endif %}>Pending</option>
+                <option value="Under Review" {% if candidate.status == 'Under Review' %}selected{% endif %}>Under Review</option>
                 <option value="Shortlisted" {% if candidate.status == 'Shortlisted' %}selected{% endif %}>Shortlisted</option>
                 <option value="Rejected" {% if candidate.status == 'Rejected' %}selected{% endif %}>Rejected</option>
               </select>
               <button type="submit" class="small-btn">Update</button>
             </form>
+            {% else %}
+              <span class="muted">No application for open job</span>
+            {% endif %}
           </td>
           <td>
+            {% if session.get('role') == 'admin' %}
             <form method="POST" action="{{ url_for('delete_candidate', candidate_id=candidate.id) }}" onsubmit="return confirm('Delete this candidate?');">
               <button type="submit" class="danger-btn">Delete</button>
             </form>
+            {% endif %}
           </td>
         </tr>
         {% else %}

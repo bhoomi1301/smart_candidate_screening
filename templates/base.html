@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Smart Candidate Screening{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}" />
   </head>
   <body>
     <header class="topbar">
@@ -14,7 +14,9 @@
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         <a href="{{ url_for('candidates') }}">Candidates</a>
         <a href="{{ url_for('jobs') }}">Jobs</a>
-        <a href="{{ url_for('logout') }}">Logout</a>
+        <form method="POST" action="{{ url_for('logout') }}" class="nav-logout">
+          <button type="submit">Logout</button>
+        </form>
       </nav>
       {% endif %}
     </header>
