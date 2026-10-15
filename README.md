@@ -648,7 +648,7 @@ Frontend tests by file:
 - **Resume PDFs are stored in PostgreSQL.** That suits typical volumes (4–5 MB cap), but very large volumes would call for object storage.
 - **Render free plan limits:** the database expires after 30 days, and the API sleeps when idle, so the first request can take about a minute.
 - **React Router 6.30** carries two moderate advisories. The open-redirect one is mitigated in our own `next=` handling, and the other only affects server-side rendering, which isn't used. Upgrading to v7 is pending.
-- **Legacy code:** the older server-rendered app (`fastapi_app.py`, `templates/`, `candidate_screening.db`) is kept for reference and is not part of the deployed system.
+- **Legacy code:** the older server-rendered app (`fastapi_app.py`, `templates/`) is kept for reference and is not part of the deployed system. Its SQLite database is not tracked in Git (`*.db` files are ignored).
 
 **Future improvements:**
 

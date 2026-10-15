@@ -6,3 +6,7 @@ venv/
 .idea/
 .vscode/
 demo_credentials.txt
+# Local SQLite files (legacy app data, scratch databases). Production uses PostgreSQL.
+*.db
+*.sqlite
+*.sqlite3
