@@ -1,0 +1,319 @@
+# TalentLens: Design Details
+
+Deeper reference material behind [README.md](../README.md): the screening engine rules, the recruitment workflow and audit actions, how each dashboard metric is defined, resume handling, and the frontend page map. Links are relative to the repository root.
+
+## Frontend (TalentLens)
+
+`frontend/` contains **TalentLens**, the web app for this API. It is built with React 18, TypeScript, and Vite, uses Tailwind CSS with shadcn/ui-style components on Radix primitives, and draws charts with Recharts. Every screen reads and writes through the FastAPI endpoints. There is no mock or hard-coded data in the app; sample data exists only in unit-test fixtures. Scores are never calculated in the browser.
+
+### Run it locally
+
+1. Start the API as described in "Local setup" (`uvicorn app:app --reload`, port 8000). Make sure `ALLOWED_ORIGINS` in `.env` includes `http://localhost:5173`.
+2. Install and start the frontend:
+   ```powershell
+   cd frontend
+   npm install
+   npm run dev
+   ```
+3. Open http://localhost:5173 and create a workspace. With `FRONTEND_URL=http://localhost:5173` in `.env`, opening the API root (`http://127.0.0.1:8000/`) also redirects there.
+
+In development, Vite proxies `/api` and `/health` to `VITE_DEV_PROXY_TARGET` (default `http://127.0.0.1:8000`). That keeps the HttpOnly auth cookies first-party on the Vite origin. If the API runs elsewhere, set `VITE_DEV_PROXY_TARGET` in `frontend/.env.local`.
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Development server with hot reload |
+| `npm run build` | Type-check (`tsc -b`) and build `frontend/dist` |
+| `npm test` | Unit and component tests (Vitest + Testing Library) |
+
+### Configuration
+
+- `VITE_API_BASE_URL`: the API origin as seen by the browser. Leave it empty when the app and API share an origin (the dev proxy, or a reverse proxy in production).
+- **Same origin (recommended):** serve `frontend/dist` and proxy `/api` to FastAPI from one host. No CORS or cross-site cookie settings are needed.
+- **Separate API origin:** set `VITE_API_BASE_URL=https://api.example.com` at build time and add the frontend origin to the backend's `ALLOWED_ORIGINS`. For cross-site cookies, also set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` over HTTPS.
+- Configure the hosting so unknown paths serve `index.html`; the app uses client-side routes.
+
+### Structure
+
+- `src/lib/api/client.ts`: the single HTTP client. It sends credentials, attaches `X-CSRF-Token` to unsafe requests, and keeps the CSRF token in memory only (re-fetched from `/api/auth/csrf` after a reload). On a 401 it runs one shared `/api/auth/refresh` and retries once. If refresh fails, the session-expiry listeners send the user to sign-in with `?next=` so they return to the same page. Errors are parsed from the API's `{"error": {...}}` envelope, and validation details are mapped to form fields.
+- `src/lib/api/types.ts` and `endpoints.ts`: TypeScript types mirroring the Pydantic schemas, and typed functions for every endpoint used.
+- `src/features/*`: one folder per area: auth, dashboard, candidates, jobs, applications, screening visualisations, and account.
+- `src/components/ui`: design-system primitives. `src/components/common`: shared states such as empty, error, skeleton, pagination, confirmation, badges, and form fields.
+
+### Pages
+
+| Route | What it does |
+|---|---|
+| `/login`, `/register` | Sign in, or create a workspace (you become its first HR user) |
+| `/` | Dashboard: totals, status distribution chart, average score by job (chart plus table), top applicants for a selected job, recent activity, skill gaps, and a date-range filter |
+| `/candidates` | Search (name, email, skill), filters (skill, application status, job, experience range), and server-side pagination |
+| `/candidates/new`, `/candidates/:id/edit` | Contact details, experience, skills (chip input), and education rows |
+| `/candidates/:id` | Profile with skills, education, applications per job (status, score, eligibility), apply to a job, and delete with confirmation |
+| `/jobs` | Status tabs, search, and pagination |
+| `/jobs/new`, `/jobs/:id/edit` | Required and preferred skills, minimum experience, qualifications (mandatory/optional, optional weights), scoring weights with a live total, and optional per-skill weights. Closed jobs cannot be edited until reopened. |
+| `/jobs/:id` | Requirements, ranked applicants with expandable score breakdowns, eligibility filter, re-screen, add applicant, close/reopen, and delete (only with no applicants) |
+| `/applications/:id` | Screening result (score ring, points per component, matched/missing skill chips, eligibility and warnings, the arithmetic behind the score), the decision panel, and the timestamped history |
+| `/account` | Profile, your activity log, and (admins) adding HR members and activating or deactivating them |
+
+### Screening and decisions in the UI
+
+- **Score:** shown as a ring labelled with its value and band (strong, partial, or weak match). For incomplete assessments, the ring also shows the "could reach" upper bound. A stacked bar and legend show how many points each component contributed out of its effective weight.
+- **Never colour alone:** matched, missing and unknown skills, eligibility, statuses and warnings are each shown with an icon and words as well as colour. Charts have text equivalents: status counts are listed, and job scores can be shown as a table.
+- **Decisions:** the decision panel offers only the transitions returned by `GET /api/applications/workflow`. It requires a rejection note of at least 10 characters (the server enforces this too) and always sends `expected_status`. If another reviewer changed the application first, the user sees why, the latest status and history load, and their typed note is kept.
+- **Out-of-date scores:** shown with a "Refresh score" action. Rejected applications explain that their score is the one the decision was based on.
+
+### Accessibility and responsiveness
+
+The app has a skip link, and focus moves to the page on navigation. Every control has a label, field errors are linked with `aria-describedby`, and focus rings are visible. Dialogs are keyboard-accessible (Radix) and become bottom sheets on phones. On small screens the navigation moves into a side sheet and tables drop secondary columns. Every page was checked at 375 px for horizontal overflow, and animation is kept minimal (and respects `prefers-reduced-motion`).
+
+### Verification
+
+- **Unit and component tests:** `npm test` runs 38 tests (see README section 16 for the latest results).
+  - The API client: CSRF attachment, the single shared refresh, the expiry signal, CSRF re-fetch, and error and field mapping.
+  - The candidate and job form schemas, which mirror the backend's rules.
+  - The screening components' accessible text.
+  - The decision panel's rejection-note rule and conflict handling.
+- **Browser walkthrough:** the full flow was run against the real API on a migrated PostgreSQL database:
+  - register, then create a candidate and a job;
+  - add an applicant and review the screening breakdown;
+  - record decisions, including a two-tab conflict;
+  - view the dashboard charts;
+  - sign out, have the session expire, and sign back in to the same page;
+  - manage team members.
+
+## Screening engine
+
+Screening is deterministic and runs only on the server: `backend/app/screening/engine.py` is a pure function (no database, randomness, or external AI service), `backend/app/screening/normalization.py` holds the synonym maps, and `backend/app/services/screening.py` loads data, persists results, and ranks. The current version is **`screening-v2`**. The frontend only displays stored results.
+
+### Weights
+
+Defaults follow the assignment: required skills **50**, preferred skills **20**, relevant experience **20**, job-relevant qualifications **10**. A job may set its own weights. A configuration is valid only if it names exactly these four components, each is 0-100, they total exactly 100, and required skills is above 0. Invalid configurations are rejected with a 422 `validation_error`; they are never silently normalized.
+
+The only adjustment the engine makes is for components the job does not use (no preferred skills, no qualifications, or minimum experience 0). These are **not applicable**: their weight is shared proportionally across the remaining components and a `weights_redistributed` warning is added. Required skills are always applicable, because every job needs at least one.
+
+### Formula
+
+For each applicable component *i* with configured weight *w_i* and component score *s_i* (0-100):
+
+```
+effective_weight_i = w_i * 100 / sum(w of applicable components)
+points_i           = effective_weight_i * s_i / 100
+score              = round_half_up(sum(points_i), 2)      # always 0-100
+```
+
+Arithmetic uses `Decimal`, and only the final score is rounded. Displayed component values are rounded to 2 decimals.
+
+| Component | Component score s_i |
+|---|---|
+| Required skills | Sum of the weights of matched required skills / sum of the weights of all required skills * 100. Skills count equally unless the job sets per-skill weights, which must cover every skill and total 100. |
+| Preferred skills | Same rule over preferred skills. If the job has none, the component is not applicable, so there is no division by zero. |
+| Experience | With Y = candidate years and M = job minimum: `100` if Y >= M, otherwise `100 * Y / M`. The score is capped at 100, so extra years earn nothing more; the surplus is shown as `difference_years`. When M = 0 the component is not applicable. |
+| Qualifications | Sum of the weights of matched criteria / sum of the weights of all criteria * 100. Criteria count equally unless the job sets qualification weights (all-or-none, total 100). Mandatory and optional criteria both count toward the score. |
+
+Worked example (default weights). A job needs Python, SQL, AWS and Docker; prefers Kubernetes and Go; needs 4 years; and lists the qualification BSc. A candidate has Python, SQL, Golang, 3 years, and an MSc in Data Science. Required 2/4 -> 25.00, preferred 1/2 (golang is a synonym of go) -> 10.00, experience 3/4 -> 15.00, qualification -> 0.00. **Score 50.00**, `not_eligible`.
+
+Example with redistribution: a job has required Python, SQL and Docker, minimum 2 years, and no preferred skills or qualifications. The applicable weights total 50 + 20 = 70, so the effective weights are 71.43 / 28.57. A candidate with Python, SQL and 10 years scores 71.428571 * 2/3 + 28.571429 = **76.19**.
+
+### Matching rules
+
+- **Skills:** lowercased and whitespace-collapsed, then mapped through an explicit synonym table (`SKILL_SYNONYMS`, for example `js -> javascript`, `postgres -> postgresql`, `k8s -> kubernetes`). Nothing is fuzzy or inferred: `pythn` does not match `python`. To add a synonym, list it under its canonical skill; the module refuses to load if one alias maps to two skills.
+- **Qualifications:** each criterion is compared with each education entry the candidate supplied (degree plus field of study). Text is lowercased, punctuation is removed, degree spellings are canonicalized (`QUALIFICATION_SYNONYMS`, for example `Bachelor of Science`/`B.Sc.` -> `bsc`), and connecting words (`in`, `of`, ...) are dropped. A criterion matches when all of its tokens appear in a single entry; the matching entry is returned as evidence. Nothing is inferred: an MSc does not satisfy a BSc requirement, and institution names are ignored.
+
+### Eligibility
+
+Eligibility is reported next to the score; it does not replace it.
+
+- **not_eligible:** there is at least one confirmed failure. That means a required skill is missing (and the candidate has skills recorded), the candidate has fewer years than the minimum, or a **mandatory** qualification is missing (and the candidate has education recorded). Failures are listed in `eligibility_failures` and `warnings`.
+- **undetermined:** there is no confirmed failure, but evidence needed for a mandatory check is missing (no skills, no experience value, or no education when a mandatory qualification exists).
+- **eligible:** every mandatory check passes.
+
+A missing required skill **lowers the score in proportion** (it is not an automatic zero). It also makes the candidate `not_eligible`. A high score from a `not_eligible` candidate therefore means "close, but missing a must-have". Missing optional qualifications or preferred skills lower the score only.
+
+### Missing-data policy
+
+Missing information is never treated as a confirmed failure, and it never earns marks. When a candidate has no skills, no experience value, or no education for an applicable component, that component has status `missing_data` and scores 0. The assessment becomes `incomplete`, and eligibility becomes `undetermined` unless some other confirmed failure exists. The breakdown includes `score_upper_bound`, the score the candidate would get if every missing component turned out perfect. The true score therefore lies between `score` and `score_upper_bound`. Each missing input gets a warning (`missing_skill_data`, `missing_experience_data`, `missing_education_data`).
+
+### Output
+
+Every result (`GET /api/applications/{id}/screening`) contains:
+- the final `score`, `eligibility`, and `assessment_status`;
+- `components`, with each component's status, configured and effective weight, score, and points;
+- `matched_skills`, `missing_mandatory_skills`, and `preferred_skills_matched`/`_missing`;
+- the `experience` comparison and `qualification_evidence`;
+- `warnings`, `scoring_version`, `evaluated_at`, and the staleness flags.
+
+### Ranking
+
+`GET /api/jobs/{job_id}/rankings` ranks applications **within one job** in this order: score descending (unscored last), then application `created_at` ascending, then application ID ascending. Ties are therefore stable: the earlier application ranks first, and `score_tied` flags shared scores. `rank` continues across pages. An optional `eligibility` filter is available.
+
+**Ranking supports HR decisions; it never makes them.** Screening never changes an application's status. Shortlisting and rejection are separate, explicit actions taken by a person and recorded in the status history.
+
+### Persistence and recalculation
+
+Each application has exactly one current `screening_results` row in PostgreSQL (the primary key is the application ID). The row holds the score, the full JSONB breakdown, eligibility, assessment status, `evaluated_at`, `scoring_version`, and `is_stale`/`stale_reason`. The application's `current_screening_score` is kept in step with it and indexed for ranking.
+
+- Creating an application evaluates it immediately.
+- Updating a candidate profile, or an open job's criteria, recalculates every affected application that is Pending, Under Review, or Shortlisted in the same transaction.
+- **Rejected** applications keep the score the decision was based on. They are marked `is_stale` (`candidate_profile_changed` / `job_criteria_changed`) instead of being rescored.
+- Results from an older `scoring_version` are reported as stale (`scoring_version_changed`). The migration marks existing rows this way.
+- `POST /api/applications/{id}/screening` re-evaluates one application and clears the stale flag. It locks the application row (`SELECT ... FOR UPDATE`) so concurrent refreshes run one after another. `POST /api/jobs/{id}/screening` refreshes a whole job; add `?include_rejected=true` to also replace rejected snapshots.
+- Duplicate applications are prevented by the unique `(candidate_id, job_id)` constraint. A concurrent request that passes the application-level pre-check fails at the database and gets the same 409 `conflict`.
+
+Refreshing requires the Admin or HR role and a CSRF token. Reading requires any authenticated workspace user. Everything is scoped to the caller's workspace, and other workspaces' IDs return 404.
+
+## Resume upload and extraction
+
+HR can attach a PDF resume to a candidate and get **unverified suggestions** for the candidate's details. Nothing extracted from a resume is saved until a person reviews it and submits the candidate form.
+
+### Upload rules
+
+- **PDF only, checked by content.** The file name must end in `.pdf`, the declared type must be `application/pdf` (or absent), and, crucially, the bytes must start with a PDF header and parse as a PDF with `pypdf`. A renamed image or text file is rejected even if its name and type claim to be a PDF.
+- **Size and pages.** At most `RESUME_MAX_BYTES` (default 5 MB). The declared request size is checked first, then the read itself is capped. At most `RESUME_MAX_PAGES` pages (default 50).
+- **Rejected uploads.** Empty, malformed and password-protected PDFs are rejected with a clear message: 415 for the wrong type, 413 when too large, 422 when unreadable. Nothing is stored for a rejected upload.
+- **File names.** Only a sanitised base name is kept: path components and control characters are removed.
+
+### Storage
+
+Files are stored in **PostgreSQL** (`resume_files.content`, `bytea`), one row per candidate resume, together with the size, a SHA-256 and the page count. This was chosen because it is reliable everywhere this app is deployed:
+
+- it is durable across restarts and redeploys, unlike a local directory on an ephemeral container disk;
+- it is covered by the database's backups and its encryption at rest;
+- each file is written in the same transaction as its metadata and audit entry;
+- files are deleted automatically with their candidate (`ON DELETE CASCADE`).
+
+The content column is loaded lazily, so candidate lists and profiles never read file bytes. With the 5 MB cap this is appropriate for typical resume volumes. Storing very large volumes would call for an object store (for example S3 with server-side encryption). That is not implemented here because it could not be tested reliably in this environment.
+
+### Access and privacy
+
+- **Download.** `GET /api/candidates/{id}/resume/file` requires a signed-in member of the candidate's workspace. Other workspaces get 404, and there is no public URL.
+- **Response headers.** Files are always sent as an attachment with `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, and a sandboxed `Content-Security-Policy`.
+- **Who can upload or remove.** Admin and HR roles, with a CSRF token. Each download is recorded in the activity log.
+- **What is never recorded.** Extracted text is not stored; suggestions are recomputed from the stored PDF on request. Resume contents, extracted details and file names are never written to logs or audit metadata. Audit entries record only sizes and page counts.
+- **No external services.** Extraction runs locally with `pypdf` and deterministic rules; resumes are never sent to an AI or third-party service.
+
+### Extraction
+
+Text is read from up to the first 10 pages (100,000 characters). Suggestions:
+
+| Field | How it is found |
+|---|---|
+| Name | The first short, capitalised line near the top. Marked **low confidence**. |
+| Emails, phones | Pattern matching. Year ranges such as `2018 - 2022` are not mistaken for phone numbers. |
+| Skills | Matched against the workspace's own skills, the screening synonym table, and a built-in list of common skills. Short or ambiguous names (Go, R, C, AI…) only count inside a "Skills" section, so prose like "go hiking" is not matched. |
+| Education | Lines containing a degree (BSc, Bachelor of Science, MSc, PhD, MBA, …), plus the field after "in"/"of", an institution (University, College, Institute…) and a year, from that line or the next. |
+| Experience | An explicit "N years of experience" if present. Otherwise, work date ranges (`Jan 2021 - Present`, `2015 - 2018`) are merged so overlaps are not double counted, and education dates are ignored. Capped at 80 years. |
+
+Every suggestion includes the snippet it came from. Outcomes are reported as a status rather than an error:
+
+- `ok`;
+- `no_text`: no readable text, for example a scanned or image-only PDF (there is no OCR);
+- `no_suggestions`;
+- `failed`: an unexpected parser error, which is logged by exception type only.
+
+The file is still stored in all four cases.
+
+### In TalentLens
+
+- **New candidate.** "Start from a resume" extracts suggestions without storing the file. HR reviews them in a dialog: choosing between found and current values, ticking skills and education entries, and editing any value. The reviewed values fill the form, marked as unverified. The PDF is attached automatically after the candidate is saved.
+- **Candidate profile.** The Resume card can upload, replace, download (fetched with the user's session) and remove a resume. "Review extracted details" re-runs extraction and opens the same dialog. Applying opens the edit form prefilled, and nothing is saved until HR submits it.
+- **Defaults.** Existing values are always kept unless HR chooses otherwise, and nothing already entered is removed.
+
+### Tests
+
+- **`tests/test_resumes.py`** (22 tests):
+  - upload, storage, download and its headers;
+  - replacing and removing, plus deletion when the candidate is deleted;
+  - prefill without storage, and workspace skills used as vocabulary;
+  - wrong extension and wrong declared type, a renamed non-PDF, empty, malformed, encrypted, too many pages, and oversized files;
+  - scanned PDFs, text with no recognisable details, and extraction failures (the upload still succeeds and nothing personal is logged);
+  - authentication, CSRF, HR read access and cross-workspace isolation;
+  - extractor false-positive checks.
+- **`tests/pdf_factory.py`** builds real PDFs in memory.
+- **Frontend.** `resume-suggestions.test.ts` covers the merge rules (never overwrite or remove without a choice, skip duplicates) and the client-side file checks.
+
+## Recruitment workflow
+
+An **Application** links one candidate to one job; the pair is unique. A candidate who applies to two jobs has two applications, each with its own status, decision notes, status history, and screening result. Changing one never affects the other. Admin and HR users can create applications and record decisions. Every query is scoped to the caller's workspace.
+
+### Statuses and permitted transitions
+
+| From | Allowed next status |
+|---|---|
+| Pending (initial) | Under Review, Rejected |
+| Under Review | Shortlisted, Rejected |
+| Shortlisted | Under Review, Rejected |
+| Rejected (terminal) | none |
+
+`GET /api/applications/workflow` returns this table and the rules below, so clients never hard-code them.
+
+- **Rejecting requires an explanatory note** of at least 10 characters (after trimming). Otherwise the request fails with 422 `validation_error`. Notes are optional for other transitions (maximum 5000 characters).
+- A transition not in the table fails with 409 `conflict`, and the message lists the allowed next statuses. An unknown status fails with 422.
+- Sending the **current** status with a note records a comment in the history without changing status. It also leaves the last decision note unchanged. Sending the current status without a note fails with 409.
+- **Concurrent reviewers:** the decision request locks the application row (`SELECT ... FOR UPDATE`), so two simultaneous decisions run one after the other, and the second is checked against the first one's result. Clients can also send `expected_status` (the status they last saw). If someone else changed the application in the meantime, the request fails with 409 instead of silently overwriting their decision.
+- **One transaction:** the status change, its `application_status_history` row, and the audit record are written in a single database transaction. If any part fails, all of it rolls back.
+- Screening never changes status. Decisions are always made by a person.
+
+Each history entry stores the previous status, new status, actor (`changed_by`, plus `changed_by_name` in the API), timestamp, and notes. Creating an application writes the first entry (`null -> Pending`).
+
+### Activity log
+
+Important actions are written to `audit_logs` in the same transaction as the change they describe. The log stores the actor, action, resource, timestamp, and safe metadata (secrets are stripped).
+
+| Area | Actions |
+|---|---|
+| Candidates | `candidate.create`, `candidate.update`, `candidate.delete`, `candidate.resume_upload`, `candidate.resume_download`, `candidate.resume_delete` |
+| Jobs | `job.create`, `job.update`, `job.status`, `job.delete` |
+| Applications | `application.create`, `application.decision`, `application.note` |
+| Screening | `screening.evaluate` (new application or manual refresh), `screening.recalculate` (candidate/job change or job-wide refresh, listing refreshed and stale application IDs) |
+| Users and auth | `workspace.register`, `user.create`, `user.activate`, `user.deactivate`, `auth.login`, `auth.refresh`, `auth.logout` |
+
+`GET /api/audit-logs` lists activity, newest first. It can be filtered by `actor_id`, `action` (an exact name, or a prefix ending in `.` such as `application.`), `resource_type`, `resource_id`, `since`, and `until`. **Admins** see every user in their workspace. **HR users** see only their own actions, and asking for another user's activity returns 403. `GET /api/users/{user_id}/activity` is Admin-only. HR users also cannot list, create, activate, or deactivate users.
+
+## Analytics
+
+Dashboard numbers come only from SQL aggregate queries over the caller's workspace. Nothing is hard-coded or sampled. Every query filters on `workspace_id`, and every join also matches `workspace_id`, so rows from another workspace can never be counted or show up as a name or title. Endpoints and response examples are in [ENDPOINTS.md](../ENDPOINTS.md#analytics).
+
+### Metric definitions
+
+| Metric | Definition |
+|---|---|
+| `total_candidates` | Candidate records created in the date range. Emails are unique per workspace (case-insensitive, enforced by the database), so the same email is never counted twice. One person entered under two different emails counts twice: the system does not guess identities. Job filters do not apply, because the candidate pool is not tied to a job. |
+| `active_job_openings` | Jobs that are currently `open`. The `department`, `job_id`, and `job_status` filters apply; the date range does not, because this is a current state. |
+| `total_applications` | Candidate-job applications created in the date range for jobs matching the filters. A candidate who applies to three jobs counts three times. |
+| `unique_applicants` | Distinct candidates with at least one application in scope. Use it alongside `total_applications` to see multiple applications. |
+| `application_statuses`, `status_distribution` | The **current** status of each application in scope. Percentages are shares of `total_applications`, rounded half-up to 2 decimals, and are `0.00` when there are no applications. |
+| `average_scores_by_job`, `overall_scores` | For each job matching the filters (jobs with no applications are listed with zero counts and `null` averages), see the coverage fields below. |
+
+**Score coverage fields:**
+- `average_score`: the mean over every application with a stored screening result.
+- `average_complete_score`: the mean over `complete` assessments only.
+- `incomplete_count`: applications with missing candidate evidence. They are included in `average_score` but excluded from `average_complete_score`; their scores are lower bounds (see "Missing-data policy").
+- `stale_count`: results scored against older data or an older engine version. They are still averaged, and counted here so they are not hidden.
+- `unscored_count`: applications with no result. They are excluded from both averages.
+
+Averages are computed from SQL sums and counts and divided in `Decimal`, so SQLite and PostgreSQL round identically.
+
+**Top applicants** use the same ranking as `/api/jobs/{job_id}/rankings`: score descending, then application time, then ID. Ranking supports decisions; it does not make them.
+
+**Recent activity** is recruitment work from the audit log: `candidate.*`, `job.*`, `application.*` and `screening.*`. Sign-ins and user administration are excluded. Every workspace member can see this feed, because the same information is already visible to them through application histories. The full audit log (`/api/audit-logs`) stays restricted: HR users see only their own entries. Candidate names and job titles are looked up live, so a deleted record keeps its activity but shows `null` for its name.
+
+**Skill gaps** count, for each required skill, the applications to jobs that require it where the candidate lacks that skill. Rules:
+- Applications whose candidate has **no skills recorded** are excluded, because the skills are unknown, not missing. They are reported as `excluded_without_skill_data`.
+- A skill is reported only when at least `min_applications` (default 3) applications were evaluated for it. If no skill reaches that, the response says `sufficient_data: false` with an explanation instead of returning misleading percentages.
+- Results are ordered by `missing_count`, then `missing_rate`, then skill name.
+- Gaps use current candidate and job data, not stored screening snapshots.
+
+**Filters**, on the dashboard and skill gaps:
+- `date_from` and `date_to`: inclusive UTC dates, applied to application creation time (and candidate creation time for `total_candidates`). `date_from` after `date_to` returns 422.
+- `job_id`: a job in another workspace returns 404.
+- `department`: case-insensitive.
+- `job_status`: `open` or `closed`.
+
+The activity feed accepts `since` and `category`.
+
+**Query cost:**
+- The dashboard runs 6 aggregate queries, whatever the data size.
+- Skill gaps run 2.
+- Activity runs 2: a count, and one joined page query.
+- Top applicants run 8 (job lookups, count, page, eager loads for results/candidates/skills, and a tie check).
+
+A test checks that the number of queries does not grow as data is added.
