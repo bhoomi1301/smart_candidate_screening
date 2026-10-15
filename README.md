@@ -336,7 +336,15 @@ Rebuilding the database and seeding again reproduces identical scores: 83.33, 20
   - `/docs` listing all 44 operations, and unauthenticated requests rejected (401) with the standard error format;
   - the Origin check accepting the site and rejecting other origins (403);
   - the API healthy across redeploys.
-- **Signed-in flow** (registration, candidates, jobs, scoring, status changes, dashboard, cross-workspace isolation, persistence): **not yet run on the live site.** The same flow passed against the production Docker image and production build in a local production-mode run. The live run uses the checklist in [docs/EMPLOYER_REVIEW.md](docs/EMPLOYER_REVIEW.md).
+- **Signed-in flow,** tested by the project owner on the live site with the checklist in [docs/EMPLOYER_REVIEW.md](docs/EMPLOYER_REVIEW.md), all working:
+  - sign-up, a validation error on a short password, and staying signed in after a refresh;
+  - sign-out, a wrong-password error, and signing back in;
+  - creating a candidate, with the duplicate-email error;
+  - creating a job, then applying the candidate (score 83.33, not eligible);
+  - Under Review → Shortlisted with timestamped history, and a rejection blocked without a note;
+  - dashboard counts, search, and the job status tabs;
+  - a second workspace receiving "Not found" for the first one's records;
+  - data intact after signing back in.
 
 The free Render instance sleeps when idle, so the first request after a pause can take about 50 seconds.
 
